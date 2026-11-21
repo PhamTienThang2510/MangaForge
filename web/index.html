@@ -179,7 +179,7 @@ dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);bord
       </div>
       <div class="pane" id="p-tr">
         <h4>Công cụ dịch</h4>
-        <div class="row"><select id="prov" style="flex:1"><option value="gtx">Google Translate (miễn phí)</option><option value="anthropic">Claude (API)</option><option value="gemini">Gemini (API)</option><option value="openai">OpenAI / LM Studio / Ollama</option></select></div>
+        <div class="row"><select id="prov" style="flex:1"><option value="gtx">Google Translate (miễn phí, không ngữ cảnh)</option><option value="anthropic">Claude (API)</option><option value="gemini">Gemini (API — có gói miễn phí)</option><option value="openai">OpenAI / LM Studio / Ollama</option></select></div>
         <div class="row"><input id="key" type="password" placeholder="API key" style="flex:1"></div>
         <div class="row"><input id="model" placeholder="Model (OpenAI/local: http://localhost:1234/v1|ten-model)" style="flex:1"></div>
         <h4>Văn phong & bối cảnh</h4>
@@ -522,9 +522,11 @@ $('#up').onchange=async e=>{const f=new FormData();[...e.target.files].forEach(x
 async function run(pages){await saveMeta();const {job}=await api(`/projects/${enc(S.name)}/process`,J('POST',{pages}));$('#runall').disabled=$('#runone').disabled=true;
   const t=setInterval(async()=>{const j=await api('/jobs/'+job);$('#bar i').style.width=(j.progress*100)+'%';$('#msg').textContent=j.msg;
     if(j.state!=='running'){clearInterval(t);$('#runall').disabled=$('#runone').disabled=false;S.data=await api('/projects/'+enc(S.name));
-      if(j.state==='error')toast('Lỗi: '+j.msg,6000);else{S.view='cmp';setViewBtn();toast('Xử lý xong')}drawFilm();showPage()}},900)}
+      if(j.state==='error')toast('Lỗi: '+j.msg,6000);else{S.view='cmp';setViewBtn();if(j.warnings&&j.warnings.length)transWarn(j.warnings);else toast('Xử lý xong')}drawFilm();showPage()}},900)}
 $('#runall').onclick=()=>run(null);$('#runone').onclick=()=>run([S.page]);
-$('#retr').onclick=async()=>{await saveMeta();busy('Đang dịch lại…');try{await api(`/projects/${enc(S.name)}/pages/${S.page}/translate`,{method:'POST'});S.data=await api('/projects/'+enc(S.name));drawFilm();showPage()}catch(e){toast('Lỗi: '+e.message)}busy()};
+$('#retr').onclick=async()=>{await saveMeta();busy('Đang dịch lại…');try{const r=await api(`/projects/${enc(S.name)}/pages/${S.page}/translate`,{method:'POST'});S.data=await api('/projects/'+enc(S.name));drawFilm();showPage();
+  if(r.warnings&&r.warnings.length)transWarn(r.warnings);else{S.transWarn=null;toast('Đã dịch lại trang này')}}catch(e){toast('Lỗi: '+e.message)}busy()};
+function transWarn(ws){S.transWarn=ws;toast('⚠ '+ws[ws.length-1],12000);drawStatus()}
 $('#expBtn').onclick=e=>{e.stopPropagation();$('#expMenu').classList.toggle('open')};
 $$('#expMenu [data-fmt]').forEach(b=>b.onclick=()=>doExport(S.name,b.dataset.fmt));
 
@@ -554,6 +556,7 @@ function drawStatus(){const r=S.rep,p=pg();if(!r){$('#statusBox').innerHTML='';r
   ${r.cleaned?issue('ok','Đã xoá chữ gốc'+(r.patched?` (tự kiểm tra & vá thêm ${r.patched} vùng)`:'')):''}
   ${r.empty_ocr.length?issue('bad',`${r.empty_ocr.length} ô OCR không đọc được chữ`,r.empty_ocr):''}
   ${r.untranslated.length?issue('warn',`${r.untranslated.length} ô chưa có bản dịch`,r.untranslated):''}
+  ${S.transWarn&&S.transWarn.length?`<div class="issue bad"><span>⛔</span><span>${esc(S.transWarn[S.transWarn.length-1])}</span><button data-tab="tr">Mở tab Dịch</button></div>`:''}
   ${r.kept&&r.kept.length?issue('ok',`${r.kept.length} ô giữ nguyên chữ gốc (không xoá/dịch)`,r.kept):''}
   ${r.overflow.length?issue('bad',`${r.overflow.length} ô chữ bị tràn khung — hãy rút ngắn bản dịch hoặc kéo to ô`,r.overflow):''}
   ${!r.empty_ocr.length&&!r.untranslated.length&&!r.overflow.length&&p.status==='done'?issue('ok','Trang này không còn vấn đề cần xử lý'):''}
@@ -565,7 +568,8 @@ function drawStatus(){const r=S.rep,p=pg();if(!r){$('#statusBox').innerHTML='';r
    <li>Detector đôi khi nhầm nét vẽ thành chữ → xoá ô thừa (Delete) rồi bấm quét lại.</li>
    <li>Dịch bằng Google Translate không có ngữ cảnh; dùng Claude/Gemini + glossary để xưng hô nhất quán.</li>
    <li>PSD xuất ra 3 lớp ảnh (Gốc / Nền sạch / Chữ dịch); chữ chưa ở dạng text layer chỉnh sửa được.</li></ul>`;
-  $$('[data-go]').forEach(b=>b.onclick=()=>{const i=idOf(+b.dataset.go);if(i>=0)select(i)})}
+  $$('[data-go]').forEach(b=>b.onclick=()=>{const i=idOf(+b.dataset.go);if(i>=0)select(i)});
+  $$('#statusBox [data-tab]').forEach(b=>b.onclick=()=>tab(b.dataset.tab))}
 
 (async()=>{await fillFonts().catch(()=>{});route()})();
 </script>

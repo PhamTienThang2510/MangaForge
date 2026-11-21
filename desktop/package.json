@@ -1,7 +1,7 @@
 {
   "name": "mangaforge",
   "productName": "MangaForge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Công cụ dịch truyện tranh mã nguồn mở: nhận diện chữ, xoá chữ, dịch theo ngữ cảnh, chèn chữ.",
   "license": "GPL-3.0-or-later",
   "author": "MangaForge contributors",
@@ -21,17 +21,52 @@
     "appId": "io.github.mangaforge",
     "productName": "MangaForge",
     "artifactName": "MangaForge-Setup-${version}.${ext}",
-    "directories": { "output": "../dist" },
-    "files": ["main.js", "preload.js", "setup.html", "package.json"],
-    "extraResources": [
-      { "from": "../engine", "to": "engine", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
-      { "from": "../web", "to": "web" },
-      { "from": "../fonts", "to": "fonts" },
-      { "from": "bin/uv.exe", "to": "bin/uv.exe" },
-      { "from": "../LICENSE", "to": "LICENSE" },
-      { "from": "../THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
+    "directories": {
+      "output": "../dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "setup.html",
+      "package.json"
     ],
-    "win": { "target": ["nsis"], "icon": "icon.ico" },
+    "extraResources": [
+      {
+        "from": "../engine",
+        "to": "engine",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      },
+      {
+        "from": "../web",
+        "to": "web"
+      },
+      {
+        "from": "../fonts",
+        "to": "fonts"
+      },
+      {
+        "from": "bin/uv.exe",
+        "to": "bin/uv.exe"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "../THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,

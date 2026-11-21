@@ -101,13 +101,17 @@ def _run_job(job, name, idxs, do_translate, do_clean):
                 pg["patched"] = patched
             if do_translate:
                 job["msg"] = f"Trang {i + 1}: dịch theo ngữ cảnh"
-                history += T.translate_page(pg["blocks"], d["lang"], history, d["glossary"], d["settings"])
+                tw = []
+                history += T.translate_page(pg["blocks"], d["lang"], history, d["glossary"], d["settings"], report=tw)
+                if tw:
+                    job.setdefault("warnings", [])
+                    job["warnings"] += [w for w in tw if w not in job["warnings"]]
             pg["status"] = "done"
             pg["rev"] += 1
             P.save(name, d)
             job["progress"] = (n + 1) / len(idxs)
         job["state"] = "done"
-        job["msg"] = "Hoàn tất"
+        job["msg"] = "Hoàn tất" + (" — có cảnh báo khi dịch" if job.get("warnings") else "")
     except Exception as e:
         traceback.print_exc()
         job["state"], job["msg"] = "error", str(e)
@@ -136,10 +140,11 @@ def retranslate(name: str, i: int):
     hist = []
     for pg in d["pages"][max(0, i - 2):i]:
         hist += [{"src": b["original"], "dst": b["translated"]} for b in pg["blocks"] if b.get("original")]
-    T.translate_page(_page(d, i)["blocks"], d["lang"], hist, d["glossary"], d["settings"])
+    warn = []
+    T.translate_page(_page(d, i)["blocks"], d["lang"], hist, d["glossary"], d["settings"], report=warn)
     d["pages"][i]["rev"] += 1
     P.save(name, d)
-    return d["pages"][i]
+    return {**d["pages"][i], "warnings": warn}
 
 
 # ---------------- chỉnh sửa
