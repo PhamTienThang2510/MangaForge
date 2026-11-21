@@ -7,6 +7,7 @@ Nhận diện chữ → OCR → xoá chữ → dịch theo ngữ cảnh cả ch�
 <p align="center">
 <a href="../../releases/latest">⬇ Tải bản cài cho Windows</a> ·
 <a href="#tính-năng">Tính năng</a> ·
+<a href="#cấu-hình-máy">Cấu hình máy</a> ·
 <a href="#phát-triển">Phát triển</a> ·
 <a href="THIRD_PARTY_NOTICES.md">Giấy phép bên thứ ba</a> ·
 <a href="#-ủng-hộ-dự-án">☕ Ủng hộ</a>
@@ -26,6 +27,25 @@ Nhận diện chữ → OCR → xoá chữ → dịch theo ngữ cảnh cả ch�
 - **Thư viện font**: 18 font Google (OFL) viết được tiếng Việt; thêm font riêng, tự kiểm tra font có đủ dấu tiếng Việt.
 - **Xuất**: PNG (ZIP), PDF, PSD 3 lớp (gốc / nền sạch / chữ), Excel lời thoại.
 - **Tab Tình trạng**: chỉ rõ ô OCR trống, ô chưa dịch, ô chữ tràn khung.
+
+## Cấu hình máy
+
+| | Tối thiểu | Khuyên dùng |
+|---|---|---|
+| Hệ điều hành | Windows 10/11 64-bit | Windows 11 |
+| Card đồ hoạ | **Không bắt buộc**: không có card NVIDIA vẫn chạy bằng CPU (chậm hơn) | NVIDIA **GTX 1650 / GTX 16xx trở lên, 4 GB VRAM** (dòng Turing trở lên: GTX 16xx, RTX 20xx/30xx/40xx/50xx) |
+| Driver NVIDIA | Bản 528 trở lên (cập nhật qua GeForce Experience / nvidia.com) | Bản mới nhất |
+| RAM | 8 GB | 16 GB |
+| Ổ cứng trống | ~3 GB (bản CPU) | ~6 GB (bản GPU) + chỗ cho project |
+| CPU | 4 nhân | 6 nhân trở lên |
+
+**Đo thực tế** trên laptop Ryzen 5 5600H + RTX 3050 Laptop 4 GB + RAM 16 GB: cả 3 trang manga 1350×1920 (nhận diện, OCR, xoá chữ)
+xong trong khoảng 1 phút; chạy bằng CPU của chính máy đó: khoảng 40 giây/trang. GTX 1650 cùng 4 GB VRAM nên chạy được,
+chậm hơn RTX 3050 một chút.
+
+- Card NVIDIA đời cũ hơn (GTX 10xx, 9xx) hoặc card AMD/Intel: app tự dùng **bản CPU** — vẫn chạy đủ tính năng, chỉ chậm hơn.
+- Dịch bằng Claude / Gemini / OpenAI / Google chạy trên máy chủ của họ nên **không tốn tài nguyên máy bạn**.
+- Đã có card NVIDIA mà góc trên app hiện "Engine: CPU" → cập nhật driver NVIDIA rồi mở lại app.
 
 ## Cài đặt (người dùng)
 
