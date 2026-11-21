@@ -1,0 +1,46 @@
+{
+  "name": "mangaforge",
+  "productName": "MangaForge",
+  "version": "0.3.0",
+  "description": "Công cụ dịch truyện tranh mã nguồn mở: nhận diện chữ, xoá chữ, dịch theo ngữ cảnh, chèn chữ.",
+  "license": "GPL-3.0-or-later",
+  "author": "MangaForge contributors",
+  "homepage": "https://github.com/PhamTienThang2510/MangaForge",
+  "repository": "github:PhamTienThang2510/MangaForge",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "fetch-uv": "node ../scripts/fetch_uv.js",
+    "dist": "npm run fetch-uv && electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "io.github.mangaforge",
+    "productName": "MangaForge",
+    "artifactName": "MangaForge-Setup-${version}.${ext}",
+    "directories": { "output": "../dist" },
+    "files": ["main.js", "preload.js", "setup.html", "package.json"],
+    "extraResources": [
+      { "from": "../engine", "to": "engine", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../web", "to": "web" },
+      { "from": "../fonts", "to": "fonts" },
+      { "from": "bin/uv.exe", "to": "bin/uv.exe" },
+      { "from": "../LICENSE", "to": "LICENSE" },
+      { "from": "../THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
+    ],
+    "win": { "target": ["nsis"], "icon": "icon.ico" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MangaForge",
+      "license": "../LICENSE",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+# Node / Electron
+desktop/node_modules/
+desktop/bin/
+dist/
+# dữ liệu chạy thử, model (tải từ nguồn gốc, không đưa vào repo)
+projects/
+models/
+*.onnx
+*.pt
+*.ckpt
+*.bin
+*.part
+*.log

@@ -1,0 +1,23 @@
+# Thư viện của engine MangaForge (Python 3.12).
+# torch + torchvision KHÔNG có ở đây: app desktop tự cài bản phù hợp máy
+#   - có card NVIDIA:  --index-url https://download.pytorch.org/whl/cu124
+#   - không có:        --index-url https://download.pytorch.org/whl/cpu
+# Phiên bản dưới đây là bộ đã chạy thử cùng nhau.
+fastapi==0.165.0
+uvicorn==0.54.0
+python-multipart==0.0.34
+requests==2.34.2
+numpy==2.5.5
+opencv-python-headless==5.1.0.95
+pillow==13.0.0
+shapely==2.2.0
+pyclipper==1.4.0
+tqdm==4.70.1
+manga-ocr==0.1.16
+transformers==5.23.0
+fugashi==1.5.2
+unidic-lite==1.0.8
+easyocr==1.7.2
+openpyxl==3.1.5
+psd-tools==1.27.0
+img2pdf==0.6.3
