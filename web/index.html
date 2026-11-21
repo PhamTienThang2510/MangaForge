@@ -122,7 +122,7 @@ dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);bord
 
 <!-- ===================== TRANG 1: QUẢN LÝ PROJECT ===================== -->
 <section id="home" class="view show">
-  <div class="top"><div class="brand"><i>M</i>MangaForge</div><span class="sp"></span><span class="chip" id="engChip">Engine: đang kiểm tra…</span><button class="g" id="aboutBtn">ⓘ Giới thiệu</button></div>
+  <div class="top"><div class="brand"><i>M</i>MangaForge</div><span class="sp"></span><span class="chip" id="engChip">Engine: đang kiểm tra…</span><button class="g" id="donateBtn" title="Ủng hộ tác giả">☕ Ủng hộ</button><button class="g" id="aboutBtn">ⓘ Giới thiệu</button></div>
   <div class="body">
     <div class="hero"><div><h1>Dự án của bạn</h1><p>Mỗi project là một chương truyện. Mở project để nhận diện, dịch và chỉnh sửa từng trang.</p></div></div>
     <div class="grid" id="cards"></div>
@@ -205,10 +205,27 @@ dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);bord
    miễn là bản chia sẻ cũng giữ giấy phép GPL và công khai mã nguồn.</div>
   <div>Mã nguồn: <a href="https://github.com/PhamTienThang2510/MangaForge" target="_blank" style="color:var(--acc)">github.com/PhamTienThang2510/MangaForge</a>
    · Không thu thập dữ liệu người dùng.</div>
+  <div>Thấy app hữu ích? <a href="#" id="aboutDonate" style="color:var(--acc)">☕ Ủng hộ tác giả</a></div>
   <div style="color:var(--mut);font-size:12px">Free code signing provided by SignPath.io, certificate by SignPath Foundation.</div>
   <details><summary style="cursor:pointer">Thành phần bên thứ ba &amp; giấy phép</summary>
    <pre id="aboutNotices" style="white-space:pre-wrap;max-height:46vh;overflow:auto;font-size:12px;background:var(--bg2);padding:10px;border-radius:10px"></pre></details>
   <div class="row" style="justify-content:flex-end"><button class="p" value="ok">Đóng</button></div></form></dialog>
+<dialog id="donate" style="max-width:720px;width:92vw"><form method="dialog">
+  <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+   <img src="donate.png" alt="Mã VietQR ủng hộ" style="width:250px;border-radius:14px;flex:none">
+   <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:10px">
+    <b style="font-size:18px">☕ Ủng hộ MangaForge</b>
+    <div>MangaForge miễn phí và mã nguồn mở. Nếu app giúp ích cho nhóm dịch của bạn, một khoản ủng hộ nhỏ sẽ giúp dự án được duy trì và phát triển tiếp. Cảm ơn bạn! 💙</div>
+    <div class="stat" style="grid-template-columns:1fr">
+     <div><span>Ngân hàng</span><b style="font-size:15px">Vietcombank — CN Thái Bình</b></div>
+     <div><span>Chủ tài khoản</span><b style="font-size:15px">PHAM TIEN THANG</b></div>
+     <div style="display:flex;align-items:center;gap:8px"><p style="flex:1;margin:0"><span>Số tài khoản</span><b style="font-size:17px;letter-spacing:.04em">1030004669</b></p>
+      <button type="button" id="copyAcc">Sao chép</button></div>
+    </div>
+    <div style="color:var(--mut);font-size:12px">Quét mã bằng app ngân hàng bất kỳ (VietQR / Napas 247). Nội dung gợi ý: <code>Ung ho MangaForge</code>.<br>
+     Không ủng hộ tiền cũng không sao — ⭐ star repo trên GitHub hoặc báo lỗi cũng là ủng hộ rất lớn.</div>
+    <div class="row" style="justify-content:flex-end"><button class="p" value="ok">Đóng</button></div>
+   </div></div></form></dialog>
 <div id="toast"></div>
 
 <script>
@@ -257,6 +274,9 @@ function doExport(n,f){toast('Đang tạo file xuất…',6000);const a=document
 api('/system').then(s=>{S.sys=s;const c=$('#engChip');c.textContent=s.device==='cuda'?`⚡ GPU: ${s.gpu}`:'Engine: CPU (chậm hơn GPU)';
   c.title=`Phiên bản ${s.version}\nModel: ${s.models_dir}\nDữ liệu: ${s.data_dir}`;c.classList.add(s.models_ready?'ok':'warn');if(!s.models_ready)c.textContent+=' · thiếu model'})
   .catch(()=>{$('#engChip').textContent='Engine: lỗi';$('#engChip').classList.add('bad')});
+$('#donateBtn').onclick=()=>$('#donate').showModal();
+$('#aboutDonate').onclick=e=>{e.preventDefault();$('#about').close();$('#donate').showModal()};
+$('#copyAcc').onclick=async()=>{try{await navigator.clipboard.writeText('1030004669');toast('Đã sao chép số tài khoản')}catch(e){toast('Số tài khoản: 1030004669')}};
 $('#aboutBtn').onclick=async()=>{const d=$('#about');const n=await fetch('/api/notices').then(r=>r.text()).catch(()=>'');
   $('#aboutVer').textContent=S.sys?S.sys.version:'';$('#aboutNotices').textContent=n||'(không đọc được THIRD_PARTY_NOTICES.md)';d.showModal()};
 

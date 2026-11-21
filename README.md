@@ -8,7 +8,8 @@ Nhận diện chữ → OCR → xoá chữ → dịch theo ngữ cảnh cả ch�
 <a href="../../releases/latest">⬇ Tải bản cài cho Windows</a> ·
 <a href="#tính-năng">Tính năng</a> ·
 <a href="#phát-triển">Phát triển</a> ·
-<a href="THIRD_PARTY_NOTICES.md">Giấy phép bên thứ ba</a>
+<a href="THIRD_PARTY_NOTICES.md">Giấy phép bên thứ ba</a> ·
+<a href="#-ủng-hộ-dự-án">☕ Ủng hộ</a>
 </p>
 
 ---
@@ -69,6 +70,21 @@ Cấu trúc:
 
 Phát hành: đẩy tag `vX.Y.Z` → GitHub Actions build bộ cài, (ký số qua SignPath nếu đã cấu hình) và tạo Release. Xem [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
+## ☕ Ủng hộ dự án
+
+MangaForge miễn phí và mã nguồn mở. Nếu app giúp ích cho nhóm dịch của bạn, bạn có thể ủng hộ để dự án được duy trì
+và phát triển tiếp — mọi khoản ủng hộ dù nhỏ đều rất quý. Cảm ơn bạn! 💙
+
+<p align="center"><img src="web/donate.png" width="300" alt="Mã VietQR chuyển khoản ủng hộ MangaForge"></p>
+
+| Ngân hàng | Chủ tài khoản | Số tài khoản |
+|---|---|---|
+| Vietcombank — CN Thái Bình | PHAM TIEN THANG | `1030004669` |
+
+Quét mã bằng app ngân hàng bất kỳ (VietQR / Napas 247). Nội dung chuyển khoản gợi ý: `Ung ho MangaForge`.
+
+Không ủng hộ tiền cũng không sao — ⭐ star repo, báo lỗi, góp ý hay chia sẻ app cho bạn bè cũng là ủng hộ rất lớn.
+
 ## Giấy phép
 
 MangaForge phát hành theo **GNU GPL v3.0 hoặc mới hơn** — xem [LICENSE](LICENSE).
@@ -86,3 +102,5 @@ inpainting with automatic leftover-text cleanup, speech-bubble type detection, c
 LLMs (Claude, Gemini, OpenAI-compatible, local LM Studio/Ollama), a WYSIWYG lettering editor, and PNG/PDF/PSD/Excel export.
 The Windows installer sets up its Python engine on first launch with `uv` and downloads the AI models from their original
 sources with SHA-256 verification.
+
+If MangaForge helps you, you can support development via the VietQR code above (Vietcombank, PHAM TIEN THANG, `1030004669`). ⭐ Stars and bug reports help too!
