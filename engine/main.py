@@ -14,6 +14,27 @@ from engine import Engine
 APP_VERSION = os.environ.get("MF_VERSION", "dev")
 app = FastAPI(title="MangaForge")
 JOBS = {}
+_PORT = os.environ.get("MF_PORT", "8765")
+_HOSTS = {f"127.0.0.1:{_PORT}", f"localhost:{_PORT}"}
+_ORIGINS = {f"http://{h}" for h in _HOSTS}
+
+
+@app.middleware("http")
+async def _local_only(request, call_next):
+    """Server chỉ phục vụ chính giao diện MangaForge trên máy này.
+    - Host phải là 127.0.0.1/localhost đúng cổng  -> chặn tấn công DNS rebinding từ trang web độc hại
+    - Yêu cầu đến từ trang web khác (Origin / Sec-Fetch-Site) -> chặn CSRF"""
+    from fastapi.responses import PlainTextResponse
+    host = (request.headers.get("host") or "").lower()
+    origin = request.headers.get("origin")
+    site = request.headers.get("sec-fetch-site")
+    if host not in _HOSTS:
+        return PlainTextResponse("Forbidden host", status_code=403)
+    if origin is not None and origin not in _ORIGINS:
+        return PlainTextResponse("Forbidden origin", status_code=403)
+    if site in ("cross-site", "same-site"):
+        return PlainTextResponse("Forbidden", status_code=403)
+    return await call_next(request)
 
 
 def _imread(p):
@@ -52,7 +73,11 @@ def new_project(body: dict = Body(...)):
 
 @app.get("/api/projects/{name}")
 def get_project(name: str):
-    return P.load(name)
+    import secretstore
+    d = P.load(name)
+    d["settings"]["api_key"] = ""  # không bao giờ gửi key ra giao diện
+    d["key_status"] = secretstore.status()
+    return d
 
 
 @app.delete("/api/projects/{name}")
@@ -69,12 +94,27 @@ async def upload(name: str, files: list[UploadFile] = File(...)):
 
 @app.put("/api/projects/{name}/meta")
 def meta(name: str, body: dict = Body(...)):
+    import secretstore
     d = P.load(name)
     for k in ("lang", "glossary", "settings", "lettering"):
         if k in body:
             d[k] = body[k]
+    st = d["settings"]
+    key = (st.pop("api_key", "") or "").strip()
+    if key and not key.startswith("••••"):  # người dùng vừa nhập key mới -> cất vào kho mã hoá
+        secretstore.set(st.get("provider", ""), key)
+    if st.pop("clear_key", False):
+        secretstore.set(st.get("provider", ""), "")
+    st["api_key"] = ""
     P.save(name, d)
-    return {"ok": True}
+    return {"ok": True, "key_status": secretstore.status()}
+
+
+def _settings_with_key(d):
+    import secretstore
+    st = dict(d["settings"])
+    st["api_key"] = secretstore.get(st.get("provider", "")) or st.get("api_key", "")
+    return st
 
 
 # ---------------- pipeline (chạy nền, có tiến độ)
@@ -102,7 +142,7 @@ def _run_job(job, name, idxs, do_translate, do_clean):
             if do_translate:
                 job["msg"] = f"Trang {i + 1}: dịch theo ngữ cảnh"
                 tw = []
-                history += T.translate_page(pg["blocks"], d["lang"], history, d["glossary"], d["settings"], report=tw)
+                history += T.translate_page(pg["blocks"], d["lang"], history, d["glossary"], _settings_with_key(d), report=tw)
                 if tw:
                     job.setdefault("warnings", [])
                     job["warnings"] += [w for w in tw if w not in job["warnings"]]
@@ -141,7 +181,7 @@ def retranslate(name: str, i: int):
     for pg in d["pages"][max(0, i - 2):i]:
         hist += [{"src": b["original"], "dst": b["translated"]} for b in pg["blocks"] if b.get("original")]
     warn = []
-    T.translate_page(_page(d, i)["blocks"], d["lang"], hist, d["glossary"], d["settings"], report=warn)
+    T.translate_page(_page(d, i)["blocks"], d["lang"], hist, d["glossary"], _settings_with_key(d), report=warn)
     d["pages"][i]["rev"] += 1
     P.save(name, d)
     return {**d["pages"][i], "warnings": warn}

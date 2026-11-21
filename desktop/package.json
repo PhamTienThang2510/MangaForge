@@ -1,7 +1,7 @@
 {
   "name": "mangaforge",
   "productName": "MangaForge",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Công cụ dịch truyện tranh mã nguồn mở: nhận diện chữ, xoá chữ, dịch theo ngữ cảnh, chèn chữ.",
   "license": "GPL-3.0-or-later",
   "author": "MangaForge contributors",

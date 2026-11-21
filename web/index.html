@@ -180,7 +180,8 @@ dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);bord
       <div class="pane" id="p-tr">
         <h4>Công cụ dịch</h4>
         <div class="row"><select id="prov" style="flex:1"><option value="gtx">Google Translate (miễn phí, không ngữ cảnh)</option><option value="anthropic">Claude (API)</option><option value="gemini">Gemini (API — có gói miễn phí)</option><option value="openai">OpenAI / LM Studio / Ollama</option></select></div>
-        <div class="row"><input id="key" type="password" placeholder="API key" style="flex:1"></div>
+        <div class="row"><input id="key" type="password" placeholder="API key" style="flex:1" autocomplete="off"><button id="keyDel" title="Xoá key đã lưu của dịch vụ này" style="display:none">Xoá key</button></div>
+        <div class="hint" id="keyHint">Key được mã hoá (Windows DPAPI) và lưu riêng trên máy này — không nằm trong file project, không đồng bộ OneDrive.</div>
         <div class="row"><input id="model" placeholder="Model (OpenAI/local: http://localhost:1234/v1|ten-model)" style="flex:1"></div>
         <h4>Văn phong & bối cảnh</h4>
         <div class="row"><input id="style" placeholder="Văn phong (vd: hài hước, thân mật)" style="flex:1"></div>
@@ -287,7 +288,7 @@ async function openWork(name){
   $('#home').classList.remove('show');$('#work').classList.add('show');
   $('#pname').textContent=name;S.page=0;S.sel=null;S.view=S.data.pages.some(p=>p.status==='done')?'cmp':'orig';
   const s=S.data.settings,l=S.data.lettering;
-  $('#lang').value=S.data.lang;$('#prov').value=s.provider;$('#key').value=s.api_key;$('#model').value=s.model;$('#style').value=s.style;$('#notes').value=s.notes;
+  $('#lang').value=S.data.lang;$('#prov').value=s.provider;$('#key').value='';S.keyStatus=S.data.key_status||{};showKey();$('#model').value=s.model;$('#style').value=s.style;$('#notes').value=s.notes;
   $('#font').value=l.font||'';$('#col').value=l.color||'#000000';$('#strk').value=l.stroke_color||'#ffffff';
   if(!$('#font').options.length)await fillFonts();$('#font').value=l.font||$('#font').options[0]?.value;
   setViewBtn();undoS=[];redoS=[];drawFilm();drawGloss();showPage();
@@ -533,10 +534,15 @@ $$('#expMenu [data-fmt]').forEach(b=>b.onclick=()=>doExport(S.name,b.dataset.fmt
 /* ---------- inspector ---------- */
 function tab(t){$$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));$$('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t))}
 $$('#tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
-async function saveMeta(){const d=S.data;d.lang=$('#lang').value;d.settings={provider:$('#prov').value,api_key:$('#key').value,model:$('#model').value,style:$('#style').value,notes:$('#notes').value};
+async function saveMeta(){const d=S.data;d.lang=$('#lang').value;d.settings={provider:$('#prov').value,api_key:$('#key').value.trim(),model:$('#model').value,style:$('#style').value,notes:$('#notes').value};
   d.lettering={font:$('#font').value,color:$('#col').dataset.set?$('#col').value:d.lettering.color||'',stroke_color:$('#strk').dataset.set?$('#strk').value:d.lettering.stroke_color||''};
-  await api(`/projects/${enc(S.name)}/meta`,J('PUT',{lang:d.lang,settings:d.settings,lettering:d.lettering,glossary:d.glossary}))}
-['#lang','#prov','#key','#model','#style','#notes'].forEach(s=>$(s).onchange=saveMeta);
+  const r=await api(`/projects/${enc(S.name)}/meta`,J('PUT',{lang:d.lang,settings:d.settings,lettering:d.lettering,glossary:d.glossary}));
+  if(d.settings.api_key){$('#key').value='';toast('Đã lưu API key (mã hoá trên máy này)')}d.settings.api_key='';S.keyStatus=r.key_status||S.keyStatus;showKey()}
+function showKey(){const p=$('#prov').value,m=(S.keyStatus||{})[p];$('#key').placeholder=p==='gtx'?'(không cần key)':m?`Đã lưu key ${m} — nhập key mới để thay`:'Dán API key vào đây';
+  $('#key').disabled=p==='gtx';$('#keyDel').style.display=m&&p!=='gtx'?'inline-block':'none'}
+$('#keyDel').onclick=async()=>{if(!confirm('Xoá API key đã lưu của dịch vụ này?'))return;const r=await api(`/projects/${enc(S.name)}/meta`,J('PUT',{settings:{...S.data.settings,provider:$('#prov').value,api_key:'',clear_key:true}}));
+  S.keyStatus=r.key_status||{};showKey();toast('Đã xoá key')};
+['#lang','#prov','#key','#model','#style','#notes'].forEach(s=>$(s).onchange=saveMeta);$('#prov').addEventListener('change',showKey);
 ['#font','#col','#strk'].forEach(s=>$(s).onchange=async e=>{e.target.dataset.set=1;await saveMeta();pg().rev++;loadImgs();if(s==='#font')drawFontList()});
 $('#autoc').onclick=async()=>{delete $('#col').dataset.set;delete $('#strk').dataset.set;S.data.lettering.color='';S.data.lettering.stroke_color='';await saveMeta();pg().rev++;loadImgs()};
 function drawGloss(){$('#gl').innerHTML=S.data.glossary.map((g,i)=>`<div class="g"><input value="${esc(g.src)}" data-i="${i}" data-k="src" placeholder="Gốc"><input value="${esc(g.dst)}" data-i="${i}" data-k="dst" placeholder="Dịch"><button data-d="${i}">✕</button></div>`).join('');

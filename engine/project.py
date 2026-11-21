@@ -46,6 +46,13 @@ def load(name):
         data = json.load(f)
     for k, v in DEFAULT.items():
         data.setdefault(k, json.loads(json.dumps(v)))
+    old = (data.get("settings") or {}).get("api_key")
+    if old:  # bản cũ lưu key dạng chữ thường trong project -> chuyển sang kho mã hoá rồi xoá khỏi file
+        import secretstore
+        if not secretstore.get(data["settings"].get("provider", "")):
+            secretstore.set(data["settings"].get("provider", ""), old)
+        data["settings"]["api_key"] = ""
+        save(name, data)
     return data
 
 
