@@ -1,0 +1,85 @@
+# Build bộ cài Windows khi đẩy tag vX.Y.Z (hoặc chạy tay), ký số qua SignPath nếu đã cấu hình, rồi tạo GitHub Release.
+#
+# Để bật ký số miễn phí (SignPath Foundation, cho dự án mã nguồn mở):
+#   1. Đăng ký tại https://signpath.org/apply.html, kết nối repo này.
+#   2. Repo Settings > Secrets and variables > Actions:
+#        secret   SIGNPATH_API_TOKEN
+#        variable SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG (vd: MangaForge), SIGNPATH_POLICY_SLUG (vd: release-signing)
+#   Chưa cấu hình -> bản cài vẫn được build và phát hành, chỉ là chưa ký.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Kiểm tra mã engine
+        run: |
+          uv run --no-project --python 3.12 python -m compileall -q engine
+          uv run --no-project --python 3.12 python -c "import ast,sys; [ast.parse(open(f,encoding='utf8').read()) for f in sys.argv[1:]]" engine/main.py engine/modelstore.py
+
+      - name: Đặt phiên bản theo tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+
+      - name: Build bộ cài
+        working-directory: desktop
+        run: |
+          npm ci
+          npm run dist
+
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: installer-unsigned
+          path: dist/MangaForge-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Ký số (SignPath Foundation)
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signed
+
+      - name: Chọn file phát hành
+        id: pick
+        shell: bash
+        run: |
+          if ls dist/signed/*.exe >/dev/null 2>&1; then f=$(ls dist/signed/*.exe | head -1); else f=$(ls dist/MangaForge-Setup-*.exe | head -1); fi
+          echo "file=$f" >> "$GITHUB_OUTPUT"
+          sha256sum "$f" | tee "$f.sha256"
+
+      - name: Tạo GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            ${{ steps.pick.outputs.file }}
+            ${{ steps.pick.outputs.file }}.sha256
