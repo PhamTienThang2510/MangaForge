@@ -8,7 +8,7 @@ desktop/bin/
 dist/
 # dữ liệu chạy thử, model (tải từ nguồn gốc, không đưa vào repo)
 projects/
-models/
+/models/
 *.onnx
 *.pt
 *.ckpt
