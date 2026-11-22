@@ -43,6 +43,12 @@ USER_FONTS_DIR = os.path.join(DATA_DIR, "fonts")  # font người dùng tự th�
 DETECTOR_SRC = os.path.join(ENGINE_DIR, "vendor", "comic_text_detector")
 
 for _d in (PROJECTS_DIR, USER_FONTS_DIR, MODELS_DIR):
-    os.makedirs(_d, exist_ok=True)
+    try:
+        os.makedirs(_d, exist_ok=True)
+    except OSError as _e:
+        # Windows Defender "Controlled folder access" chặn tạo thư mục trong Documents -> Windows trả về WinError 2 khó hiểu.
+        # Dấu MF_WRITE_BLOCKED để app desktop nhận ra và báo người dùng chọn thư mục khác.
+        raise SystemExit(f"MF_WRITE_BLOCKED: không tạo được thư mục {_d} ({_e}). "
+                         "Có thể Windows Defender (Controlled folder access) hoặc quyền truy cập đang chặn.")
 if DETECTOR_SRC not in sys.path:
     sys.path.insert(0, DETECTOR_SRC)

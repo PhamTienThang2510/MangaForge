@@ -42,12 +42,26 @@ button.p:hover{background:var(--action-hover)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 details summary{cursor:pointer;color:var(--mut);font-size:12px;margin-top:10px}
 .foot{color:var(--mut);font-size:11.5px;margin-top:14px}
+#choose{display:none;margin:0 0 16px;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
+#choose label{display:block;font-weight:600;margin-bottom:8px}
+.pick{display:flex;gap:8px}
+.pick input{flex:1;min-width:0;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--control-line);border-radius:6px;padding:7px 10px}
+#space,#chint{color:var(--mut);font-size:12px;margin-top:6px}#space.low{color:var(--bad)}
+button:disabled{opacity:.6;cursor:default}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="brand"><i>M</i>MangaForge <span id="ver" style="font-weight:400;color:var(--mut);font-size:13px"></span></div>
   <div class="sub" id="sub">Đang khởi động…</div>
+  <div id="choose">
+    <label for="dir">Thư mục lưu engine AI, model và project</label>
+    <div class="pick"><input id="dir" readonly><button id="pick">Chọn…</button></div>
+    <div id="space"></div>
+    <div id="chint">Nên chọn ổ còn nhiều chỗ trống. Không chọn Documents / Desktop vì Windows Defender thường chặn ghi ở đó.</div>
+    <div class="err" id="cerr"></div>
+    <div class="row"><button class="p" id="go">Bắt đầu cài đặt</button></div>
+  </div>
   <ul id="steps">
     <li data-id="python"><span class="ic"></span>Chuẩn bị Python</li>
     <li data-id="torch"><span class="ic"></span>Cài PyTorch (nền tảng AI)</li>
@@ -58,7 +72,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px;margin-top:10px}
   <div class="bar"><i id="pbar"></i></div><div id="ptext"></div>
   <div class="err" id="err"></div>
   <details id="det"><summary>Chi tiết</summary><pre id="log"></pre></details>
-  <div class="row"><button id="logs">Mở thư mục log</button><button class="p" id="retry" style="display:none">Thử lại</button></div>
+  <div class="row"><button id="logs">Mở thư mục log</button><button id="rechoose" style="display:none">Chọn thư mục khác</button><button class="p" id="retry" style="display:none">Thử lại</button></div>
   <div class="foot">Lần đầu cần Internet để tải thành phần (chỉ một lần). Model AI được tải trực tiếp từ nguồn gốc và kiểm tra checksum.
     MangaForge là phần mềm mã nguồn mở (GPL-3.0).</div>
 </div>
@@ -74,9 +88,22 @@ mf.on('setup:log',t=>{const l=$('#log');l.textContent+=t+'\n';if(l.textContent.l
 mf.on('setup:progress',e=>{$('#pbar').style.width=(e.done/e.total*100).toFixed(1)+'%';
   $('#ptext').textContent=`${mb(e.done)} / ${mb(e.total)} · ${mb(e.speed)}/s`+(e.eta!=null?` · còn khoảng ${e.eta>90?Math.round(e.eta/60)+' phút':e.eta+' giây'}`:'')});
 mf.on('setup:info',i=>{$('#ptext').textContent=i.gpu?`Phát hiện card NVIDIA → cài bản tăng tốc GPU (${i.size}).`:`Không thấy card NVIDIA → cài bản CPU (${i.size}).`});
-mf.on('setup:error',m=>{$('#err').style.display='block';$('#err').textContent='Có lỗi: '+m+' — kiểm tra kết nối mạng / dung lượng ổ đĩa rồi bấm “Thử lại”.';
-  $('#retry').style.display='inline-block';$('#det').open=true;const r=document.querySelector('li.run');if(r){r.className='err';r.querySelector('.ic').textContent='!'}});
-$('#retry').onclick=()=>{$('#err').style.display='none';$('#retry').style.display='none';mf.retry()};
+mf.on('setup:error',e=>{$('#err').style.display='block';$('#err').textContent='Có lỗi: '+e.message;
+  $('#retry').style.display='inline-block';$('#rechoose').style.display=e.blocked?'inline-block':'none';
+  $('#det').open=true;const r=document.querySelector('li.run');if(r){r.className='err';r.querySelector('.ic').textContent='!'}});
+const hideErr=()=>{$('#err').style.display='none';$('#retry').style.display='none';$('#rechoose').style.display='none'};
+$('#retry').onclick=()=>{hideErr();mf.retry()};
+$('#rechoose').onclick=()=>{hideErr();ORDER.forEach(k=>setStep({id:k,state:''}));$('#pbar').style.width='0';mf.rechoose()};
+// ---- chọn nơi lưu (lần chạy đầu)
+const gb=b=>(b/1073741824).toFixed(1).replace('.',',')+' GB';
+async function showDir(d){$('#dir').value=d;$('#cerr').style.display='none';const s=await mf.space(d);if(!s)return;
+  const sp=$('#space');sp.textContent=s.free==null?`Cần khoảng ${gb(s.need)} trống.`:`Ổ này còn trống ${gb(s.free)} · cần khoảng ${gb(s.need)}`;
+  sp.className=s.free!=null&&s.free<s.need?'low':''}
+mf.on('setup:choose',c=>{$('#choose').style.display='block';$('#go').disabled=false;
+  $('#sub').textContent=`Chọn nơi lưu dữ liệu (${c.gpu?'bản GPU':'bản CPU'}, cần khoảng ${gb(c.need)}).`;showDir(c.dir);$('#pick').focus()});
+$('#pick').onclick=async()=>{const d=await mf.pick();if(d)showDir(d)};
+$('#go').onclick=async()=>{$('#go').disabled=true;const err=await mf.confirm($('#dir').value);
+  if(err){$('#cerr').textContent=err;$('#cerr').style.display='block';$('#go').disabled=false}else $('#choose').style.display='none'};
 $('#logs').onclick=()=>mf.openLogs();
 mf.meta().then(m=>$('#ver').textContent='v'+m.version);
 </script>
