@@ -5,28 +5,41 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
 <title>MangaForge</title>
 <style>
-:root{--bg:#0f1115;--panel:#1b2029;--panel2:#232a36;--line:#2c3441;--fg:#eef1f6;--mut:#8f9bb0;--acc:#5b8cff;--acc2:#7c5cff;--ok:#35d399;--bad:#ff6270}
+:root{
+  color-scheme:dark;
+  --bg:#11161d;--bg2:#151c25;--panel:#1b2430;--panel2:#253141;--line:#39485b;--control-line:#687b90;
+  --fg:#edf2f8;--mut:#b2bfd0;--acc:#8db8ff;--action:#2858a9;--action-hover:#3064b6;
+  --ok:#74d5af;--bad:#ff9a9e;--shadow:0 8px 24px #0005}
+@media (prefers-color-scheme: light){:root{
+  color-scheme:light;
+  --bg:#edf1f6;--bg2:#e4eaf1;--panel:#fff;--panel2:#f4f7fa;--line:#ccd5df;--control-line:#7b8898;
+  --fg:#172536;--mut:#4f6073;--acc:#235ba7;--action:#235ba7;--action-hover:#194b92;
+  --ok:#166749;--bad:#a22733;--shadow:0 8px 24px #1b2a4a20}}
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 "Segoe UI",system-ui,sans-serif;display:grid;place-items:center}
-.card{width:min(640px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px 30px;box-shadow:0 20px 60px #0008}
+.card{width:min(640px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px 30px;box-shadow:var(--shadow)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
-.brand i{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;color:#fff;font-style:normal}
+.brand i{width:34px;height:34px;border-radius:6px;background:var(--action);display:grid;place-items:center;color:#fff;font-style:normal}
 .sub{color:var(--mut);margin:6px 0 18px}
 ul{list-style:none;padding:0;margin:0 0 16px}
 li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);color:var(--mut)}
 li:last-child{border-bottom:0}
 li .ic{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;flex:none}
 li.run{color:var(--fg)}li.run .ic{border-color:var(--acc);border-top-color:transparent;animation:spin 1s linear infinite}
-li.ok{color:var(--fg)}li.ok .ic{background:var(--ok);border-color:var(--ok);color:#06241a}
-li.err .ic{background:var(--bad);border-color:var(--bad);color:#fff}
+li.ok{color:var(--fg)}li.ok .ic{background:var(--ok);border-color:var(--ok);color:var(--bg)}
+li.err .ic{background:var(--bad);border-color:var(--bad);color:var(--bg)}
 @keyframes spin{to{transform:rotate(360deg)}}
-.bar{height:8px;background:var(--panel2);border-radius:9px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--ok));transition:width .3s}
+.bar{height:8px;background:var(--panel2);border-radius:9px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
+@media (prefers-reduced-motion: reduce){li.run .ic{animation:none}.bar i{transition:none}}
 #ptext{color:var(--mut);font-size:12px;min-height:18px}
-pre{background:#0b0d11;border:1px solid var(--line);border-radius:10px;padding:10px;height:130px;overflow:auto;font:11.5px/1.45 Consolas,monospace;color:#aab3c2;white-space:pre-wrap;margin:10px 0 0}
+pre{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:10px;height:130px;overflow:auto;font:11.5px/1.45 Consolas,monospace;color:var(--fg);white-space:pre-wrap;margin:10px 0 0}
 .err{display:none;background:color-mix(in srgb,var(--bad) 14%,transparent);border:1px solid var(--bad);border-radius:10px;padding:10px 12px;margin-top:12px}
 .row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
-button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 14px;cursor:pointer}
-button.p{background:linear-gradient(135deg,var(--acc),var(--acc2));border:0;color:#fff;font-weight:600}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--control-line);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,var(--panel2))}
+button.p{background:var(--action);border-color:transparent;color:#fff;font-weight:600}
+button.p:hover{background:var(--action-hover)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 details summary{cursor:pointer;color:var(--mut);font-size:12px;margin-top:10px}
 .foot{color:var(--mut);font-size:11.5px;margin-top:14px}
 </style>
