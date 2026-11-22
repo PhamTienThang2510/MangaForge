@@ -192,15 +192,17 @@ class Engine:
         H, W = mask.shape
         flat = np.zeros((H, W), np.uint8)
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        background = None
         for b in blocks:
             poly = b.get("bubble")
             if not poly or b.get("type") not in ("speech", "thought", "shout", "narration"):
                 continue
+            if background is None:
+                background = cv2.dilate(mask, np.ones((5, 5), np.uint8)) == 0
             pm = np.zeros((H, W), np.uint8)
             cv2.fillPoly(pm, [np.array(poly, np.int32)], 255)
             inner = cv2.erode(pm, np.ones((9, 9), np.uint8))
-            md = cv2.dilate(mask, np.ones((5, 5), np.uint8))
-            bgpix = (inner > 0) & (md == 0)
+            bgpix = (inner > 0) & background
             if bgpix.sum() < 50:
                 continue
             vals = gray[bgpix]
