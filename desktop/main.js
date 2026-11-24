@@ -6,6 +6,7 @@ const { spawn, execFile } = require('child_process');
 const crypto = require('crypto');
 const http = require('http');
 const net = require('net');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
@@ -13,13 +14,20 @@ const VERSION = app.getVersion();
 // Vị trí mã nguồn engine/web/fonts: trong bản cài -> resources/, khi phát triển -> thư mục repo
 const SRC = app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..');
 const ENGINE_SRC = path.join(SRC, 'engine');
-const TORCH = { version: '2.6.0', vision: '0.21.0', cuda: 'cu124' };
+const IS_WINDOWS = process.platform === 'win32';
+const TORCH = IS_WINDOWS
+  ? { version: '2.6.0', vision: '0.21.0', cuda: 'cu124' }
+  : { version: '2.7.1', vision: '0.22.1', cuda: 'cu128' };
 
 // ---------- vị trí dữ liệu
 // HOME: engine Python + model AI + log (vài GB).  DATA: project + font tự thêm.
 // Người dùng chọn thư mục ở lần chạy đầu; lựa chọn lưu trong %APPDATA%\MangaForge\location.json.
 // Bản ≤0.3.2 dùng %LOCALAPPDATA%\MangaForge + Documents\MangaForge: nếu đã cài ở đó thì giữ nguyên.
-const LEGACY_HOME = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'MangaForge');
+const xdgData = process.env.XDG_DATA_HOME;
+const DEFAULT_HOME = path.join(IS_WINDOWS
+  ? process.env.LOCALAPPDATA || app.getPath('appData')
+  : xdgData && path.isAbsolute(xdgData) ? xdgData : path.join(os.homedir(), '.local', 'share'),
+  'MangaForge');
 const LOC_FILE = path.join(app.getPath('userData'), 'location.json');
 // Các thư mục Windows Defender "Controlled folder access" bảo vệ mặc định -> python.exe bị chặn ghi
 const PROTECTED = ['documents', 'desktop', 'pictures', 'videos', 'music'];
@@ -28,7 +36,9 @@ let forceChoose = false, needBytes = 0;
 
 function setLocation(home, data) {
   HOME = home; DATA = data;
-  VENV = path.join(HOME, 'engine'); PY = path.join(VENV, 'Scripts', 'python.exe'); MARKER = path.join(VENV, '.mangaforge-ready.json');
+  VENV = path.join(HOME, 'engine');
+  PY = path.join(VENV, ...(IS_WINDOWS ? ['Scripts', 'python.exe'] : ['bin', 'python']));
+  MARKER = path.join(VENV, '.mangaforge-ready.json');
 }
 function saveLocation(home, data) {
   fs.mkdirSync(path.dirname(LOC_FILE), { recursive: true });
@@ -41,10 +51,10 @@ function loadLocation() {
     const l = JSON.parse(fs.readFileSync(LOC_FILE, 'utf8'));
     if (l.home && l.data) { setLocation(l.home, l.data); return true; }
   } catch (e) {}
-  if (!forceChoose && fs.existsSync(path.join(LEGACY_HOME, 'engine', '.mangaforge-ready.json'))) {
+  if (IS_WINDOWS && !forceChoose && fs.existsSync(path.join(DEFAULT_HOME, 'engine', '.mangaforge-ready.json'))) {
     // cập nhật từ bản cũ: engine đã nằm ở vị trí cũ -> giữ nguyên, khỏi tải lại vài GB
     const docs = path.join(app.getPath('documents'), 'MangaForge');
-    saveLocation(LEGACY_HOME, fs.existsSync(path.join(docs, 'projects')) ? docs : LEGACY_HOME);
+    saveLocation(DEFAULT_HOME, fs.existsSync(path.join(docs, 'projects')) ? docs : DEFAULT_HOME);
     return true;
   }
   return false;
@@ -58,7 +68,7 @@ function freeBytes(dir) {
 }
 const gb = b => (b / 1073741824).toFixed(1).replace('.', ',') + ' GB';
 function checkTarget(dir) {
-  for (const k of PROTECTED) {
+  for (const k of IS_WINDOWS ? PROTECTED : []) {
     let p; try { p = app.getPath(k); } catch (e) { continue; }
     const rel = path.relative(p, dir);
     if (!rel || (!rel.startsWith('..') && !path.isAbsolute(rel)))
@@ -66,8 +76,9 @@ function checkTarget(dir) {
   }
   try {
     fs.mkdirSync(dir, { recursive: true });
-    const t = path.join(dir, '.mf-write-test'); fs.writeFileSync(t, 'ok'); fs.unlinkSync(t);
-  } catch (e) { return `Không ghi được vào ${dir} (${e.code || e.message}). Có thể thiếu quyền hoặc bị phần mềm diệt virus chặn — hãy chọn thư mục khác.`; }
+    const probe = fs.mkdtempSync(path.join(dir, '.mf-write-test-'));
+    fs.rmdirSync(probe);
+  } catch (e) { return `Không ghi được vào ${dir} (${e.code || e.message}) — hãy chọn thư mục khác.`; }
   const free = freeBytes(dir);
   if (free != null && free < needBytes) return `Ổ này chỉ còn trống ${gb(free)}, cần khoảng ${gb(needBytes)}. Hãy chọn ổ khác.`;
   return null;
@@ -84,7 +95,9 @@ let win = null, server = null, port = 0, setupBusy = false;
 let recent = []; // các dòng output gần nhất của tiến trình con, để đoán nguyên nhân lỗi
 
 function uvPath() {
-  const cands = [path.join(SRC, 'bin', 'uv.exe'), path.join(__dirname, 'bin', 'uv.exe')];
+  const name = IS_WINDOWS ? 'uv.exe' : 'uv';
+  const devBin = IS_WINDOWS ? ['bin', name] : ['bin', 'linux', name];
+  const cands = [path.join(SRC, 'bin', name), path.join(__dirname, ...devBin)];
   for (const c of cands) if (fs.existsSync(c)) return c;
   return 'uv'; // khi phát triển: dùng uv trong PATH
 }
@@ -109,6 +122,7 @@ function run(cmd, args, opts = {}) {
 }
 
 function hasNvidia() {
+  if (!IS_WINDOWS) return Promise.resolve(process.env.MF_TORCH === 'cuda');
   if (process.env.MF_TORCH) return Promise.resolve(process.env.MF_TORCH !== 'cpu');
   return new Promise(res => execFile('nvidia-smi', ['-L'], { windowsHide: true, timeout: 8000 },
     (err, out) => res(!err && /GPU/i.test(String(out)))));
@@ -119,7 +133,11 @@ function reqHash() {
   return crypto.createHash('sha256').update(r).update(JSON.stringify(TORCH)).digest('hex').slice(0, 16);
 }
 function engineReady() {
-  try { const m = JSON.parse(fs.readFileSync(MARKER, 'utf8')); return fs.existsSync(PY) && m.req === reqHash() ? m : null; }
+  try {
+    const m = JSON.parse(fs.readFileSync(MARKER, 'utf8'));
+    return fs.existsSync(PY) && m.req === reqHash()
+      && (IS_WINDOWS || m.flavor === (process.env.MF_TORCH === 'cuda' ? TORCH.cuda : 'cpu'));
+  }
   catch (e) { return null; }
 }
 function modelsReady() {
@@ -135,11 +153,17 @@ async function installEngine() {
   send('setup:info', { gpu, size: gpu ? 'khoảng 3–4 GB' : 'khoảng 1–1,5 GB' });
   const uv = uvPath();
   step('python', 'run', 'Đang chuẩn bị Python 3.12…');
-  await run(uv, ['venv', VENV, '--python', '3.12', '--allow-existing']);
+  if (!IS_WINDOWS) fs.rmSync(MARKER, { force: true });
+  try { await run(uv, ['venv', VENV, '--python', '3.12', '--allow-existing']); }
+  catch (e) {
+    if (!IS_WINDOWS && e.code === 'ENOENT') throw new Error('Không tìm thấy uv. Hãy cài uv và thêm vào PATH, hoặc dùng gói .deb');
+    throw e;
+  }
   step('python', 'ok');
   step('torch', 'run', gpu ? 'Đang tải PyTorch bản GPU (NVIDIA CUDA) — bước lâu nhất, khoảng 2,5 GB…' : 'Đang tải PyTorch bản CPU…');
   await run(uv, ['pip', 'install', '--python', PY, `torch==${TORCH.version}`, `torchvision==${TORCH.vision}`,
-    '--index-url', `https://download.pytorch.org/whl/${flavor}`]);
+    '--index-url', `https://download.pytorch.org/whl/${flavor}`,
+    ...(IS_WINDOWS ? [] : ['--reinstall-package', 'torch', '--reinstall-package', 'torchvision'])]);
   step('torch', 'ok');
   step('libs', 'run', 'Đang cài thư viện OCR, xử lý ảnh, xuất file…');
   await run(uv, ['pip', 'install', '--python', PY, '-r', path.join(ENGINE_SRC, 'requirements.txt')]);
@@ -170,9 +194,9 @@ function downloadModels() {
 
 // ---------- khởi động engine
 function freePort(start) {
-  return new Promise(res => {
+  return new Promise((res, reject) => {
     const s = net.createServer();
-    s.once('error', () => res(freePort(start + 1)));
+    s.once('error', e => e.code === 'EADDRINUSE' ? res(freePort(start + 1)) : reject(e));
     s.listen(start, '127.0.0.1', () => s.close(() => res(start)));
   });
 }
@@ -186,14 +210,20 @@ async function startEngine() {
   const env = engineEnv({ MF_PORT: String(port), MF_NO_BROWSER: '1', MF_VERSION: VERSION,
     MF_WEB: path.join(SRC, 'web'), MF_FONTS: path.join(SRC, 'fonts') });
   const out = fs.openSync(path.join(logDir(), 'engine.log'), 'a');
-  server = spawn(PY, ['main.py'], { cwd: ENGINE_SRC, env, windowsHide: true, stdio: ['ignore', out, out] });
-  server.on('exit', c => { log('engine exit ' + c); server = null; });
+  try { server = spawn(PY, ['main.py'], { cwd: ENGINE_SRC, env, windowsHide: true, stdio: ['ignore', out, out] }); }
+  finally { fs.closeSync(out); }
+  const child = server;
+  const clearServer = () => { if (server === child) server = null; };
+  let spawnError;
+  child.once('error', e => { spawnError = e; clearServer(); });
+  child.once('exit', c => { log('engine exit ' + c); clearServer(); });
   for (let i = 0; i < 360; i++) {
-    if (!server) throw new Error('Engine dừng đột ngột — xem logs\\engine.log');
+    if (server !== child) throw spawnError || new Error(`Engine dừng đột ngột — xem ${path.join(logDir(), 'engine.log')}`);
     if (await ping()) { step('start', 'ok'); return; }
     await new Promise(r => setTimeout(r, 500));
   }
-  throw new Error('Engine không phản hồi sau 3 phút — xem logs\\engine.log');
+  stopEngine();
+  throw new Error(`Engine không phản hồi sau 3 phút — xem ${path.join(logDir(), 'engine.log')}`);
 }
 
 function showSetup() {
@@ -214,8 +244,8 @@ async function boot() {
       // lần chạy đầu: cho người dùng chọn nơi lưu (engine + model + project)
       const gpu = await hasNvidia();
       needBytes = (gpu ? 6.5 : 3) * 1073741824;
-      log(`choose location (default ${LEGACY_HOME}, need ${gb(needBytes)})`);
-      send('setup:choose', { dir: LEGACY_HOME, free: freeBytes(LEGACY_HOME), need: needBytes, gpu });
+      log(`choose location (default ${DEFAULT_HOME}, need ${gb(needBytes)})`);
+      send('setup:choose', { dir: DEFAULT_HOME, free: freeBytes(DEFAULT_HOME), need: needBytes, gpu, windows: IS_WINDOWS });
       return;
     }
     log(`location home=${HOME} data=${DATA || '(mặc định)'}`);
@@ -229,14 +259,15 @@ async function boot() {
     log('boot failed ' + (e && e.stack));
     showSetup();
     const msg = String((e && e.message) || e);
-    const blocked = writeBlocked(msg);
-    send('setup:error', {
-      blocked,
-      message: blocked
-        ? `Windows không cho MangaForge ghi vào ${DATA || HOME}. Thường do Windows Security → "Controlled folder access" chặn python.exe. ` +
-          `Hãy bấm “Chọn thư mục khác”, hoặc cho phép python.exe trong Windows Security rồi bấm “Thử lại”.`
-        : `${msg} — kiểm tra kết nối mạng / dung lượng ổ đĩa rồi bấm “Thử lại”.`,
-    });
+    const blocked = e?.syscall !== 'listen' && writeBlocked(msg);
+    let message = `${msg} — kiểm tra kết nối mạng / dung lượng ổ đĩa rồi bấm “Thử lại”.`;
+    if (blocked && IS_WINDOWS) {
+      message = `Windows không cho MangaForge ghi vào ${DATA || HOME}. Thường do Windows Security → "Controlled folder access" chặn python.exe. ` +
+        `Hãy bấm “Chọn thư mục khác”, hoặc cho phép python.exe trong Windows Security rồi bấm “Thử lại”.`;
+    } else if (blocked) {
+      message = `Không ghi được vào ${DATA || HOME}. Hãy kiểm tra quyền ghi hoặc chọn thư mục khác.`;
+    }
+    send('setup:error', { blocked, message });
   } finally { setupBusy = false; }
 }
 
@@ -269,7 +300,15 @@ ipcMain.handle('setup:rechoose', () => {
 });
 
 function stopEngine() {
-  if (server) { try { spawn('taskkill', ['/pid', String(server.pid), '/T', '/F'], { windowsHide: true }); } catch (e) {} server = null; }
+  const child = server;
+  server = null;
+  if (!child?.pid) return;
+  if (IS_WINDOWS) {
+    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
+      .once('error', e => { log(`taskkill: ${e.message}`); child.kill(); });
+  } else {
+    child.kill('SIGTERM');
+  }
 }
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -282,7 +321,7 @@ else {
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
     win.once('ready-to-show', () => win.show());
     win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
-    // xuất file (ZIP/PDF/PSD/Excel) -> hộp thoại "Lưu thành" của Windows
+    // xuất file (ZIP/PDF/PSD/Excel) -> hộp thoại "Lưu thành"
     win.webContents.session.on('will-download', (e, item) => item.setSaveDialogOptions({ defaultPath: item.getFilename() }));
     win.loadFile(path.join(__dirname, 'setup.html'));
     win.webContents.once('did-finish-load', boot);

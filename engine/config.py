@@ -2,7 +2,7 @@
 
 Biến môi trường (tuỳ chọn) để ghi đè:
   MF_DATA    thư mục dữ liệu người dùng (project, font tự thêm)   mặc định: Documents/MangaForge
-  MF_HOME    thư mục máy (model AI, engine Python)               mặc định: %LOCALAPPDATA%/MangaForge
+  MF_HOME    thư mục máy (model AI, engine Python)               mặc định: %LOCALAPPDATA%/MangaForge hoặc ~/.local/share/MangaForge
   MF_MODELS  thư mục model AI                                     mặc định: MF_HOME/models
   MF_WEB     thư mục giao diện web                                 mặc định: <repo>/web
   MF_FONTS   thư mục font đi kèm                                   mặc định: <repo>/fonts
@@ -30,7 +30,8 @@ def _documents():
 def _local_appdata():
     if sys.platform == "win32":
         return os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
-    return os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    xdg_data = os.environ.get("XDG_DATA_HOME", "")
+    return xdg_data if os.path.isabs(xdg_data) else os.path.join(os.path.expanduser("~"), ".local", "share")
 
 
 DATA_DIR = os.environ.get("MF_DATA") or os.path.join(_documents(), "MangaForge")
@@ -48,7 +49,6 @@ for _d in (PROJECTS_DIR, USER_FONTS_DIR, MODELS_DIR):
     except OSError as _e:
         # Windows Defender "Controlled folder access" chặn tạo thư mục trong Documents -> Windows trả về WinError 2 khó hiểu.
         # Dấu MF_WRITE_BLOCKED để app desktop nhận ra và báo người dùng chọn thư mục khác.
-        raise SystemExit(f"MF_WRITE_BLOCKED: không tạo được thư mục {_d} ({_e}). "
-                         "Có thể Windows Defender (Controlled folder access) hoặc quyền truy cập đang chặn.")
+        raise SystemExit(f"MF_WRITE_BLOCKED: không tạo được thư mục {_d} ({_e}).")
 if DETECTOR_SRC not in sys.path:
     sys.path.insert(0, DETECTOR_SRC)

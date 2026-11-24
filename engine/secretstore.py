@@ -4,12 +4,14 @@
   và không theo thư mục project khi bạn chia sẻ project cho người khác.
 - Trên Windows: mã hoá bằng DPAPI (CryptProtectData, phạm vi người dùng hiện tại) — chỉ đúng tài khoản Windows
   trên đúng máy này giải mã được.
+- Trên Linux: giới hạn quyền truy cập file cho chủ sở hữu. Dữ liệu lưu ở dạng base64, không mã hoá.
 - Giao diện chỉ nhận về dạng che (••••abcd), không bao giờ nhận lại key đầy đủ.
 """
 import base64
 import json
 import os
 import sys
+import tempfile
 import threading
 
 from config import HOME_DIR
@@ -73,12 +75,16 @@ def _load():
 
 def _save(d):
     os.makedirs(HOME_DIR, exist_ok=True)
-    tmp = PATH + ".tmp"
-    with open(tmp, "wb") as f:
-        f.write(_protect(json.dumps(d).encode("utf8")))
-    if sys.platform != "win32":
-        os.chmod(tmp, 0o600)
-    os.replace(tmp, PATH)
+    fd, tmp = tempfile.mkstemp(prefix=".secrets-", dir=HOME_DIR)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            if sys.platform != "win32" and os.fstat(f.fileno()).st_mode & 0o077:
+                raise PermissionError("Thư mục lưu API key phải hỗ trợ quyền file riêng tư.")
+            f.write(_protect(json.dumps(d).encode("utf8")))
+        os.replace(tmp, PATH)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
 
 
 def get(provider):
