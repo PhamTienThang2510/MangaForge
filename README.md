@@ -32,7 +32,7 @@ Nhận diện chữ → OCR → xoá chữ → dịch theo ngữ cảnh cả ch�
 
 | | Tối thiểu | Khuyên dùng |
 |---|---|---|
-| Hệ điều hành | Windows 10/11 64-bit | Windows 11 |
+| Hệ điều hành | Windows 10/11 64-bit hoặc Ubuntu 24.04 LTS (amd64) | Windows 11 hoặc Ubuntu 24.04 LTS (amd64) |
 | Card đồ hoạ | **Không bắt buộc**: không có card NVIDIA vẫn chạy bằng CPU (chậm hơn) | NVIDIA **GTX 1650 / GTX 16xx trở lên, 4 GB VRAM** (dòng Turing trở lên: GTX 16xx, RTX 20xx/30xx/40xx/50xx) |
 | Driver NVIDIA | Bản 528 trở lên (cập nhật qua GeForce Experience / nvidia.com) | Bản mới nhất |
 | RAM | 8 GB | 16 GB |
@@ -58,9 +58,25 @@ chậm hơn RTX 3050 một chút.
 
 Dữ liệu: project và font tự thêm ở `Documents\MangaForge`; engine + model ở `%LOCALAPPDATA%\MangaForge` (xoá thư mục này để cài lại engine).
 
+### Ubuntu 24.04 LTS (amd64)
+
+Tạo gói `.deb` trên Ubuntu bằng Node.js 20+ và npm:
+
+```bash
+cd desktop
+npm ci
+npm run dist:linux
+cd ..
+sudo apt install ./dist/MangaForge-0.3.3-amd64.deb
+```
+
+Mở **MangaForge** từ menu ứng dụng. Lần đầu, chọn thư mục riêng có quyền ghi và ít nhất 3 GB trống. Mặc định là `~/.local/share/MangaForge` (hoặc `$XDG_DATA_HOME/MangaForge`). Cần Internet để tải Python, thư viện và model. API key được lưu trong file riêng của tài khoản, dưới dạng base64 và không mã hoá.
+
+Linux mặc định dùng CPU. Nếu đã cài driver NVIDIA hỗ trợ CUDA 12.8, có thể chạy `MF_TORCH=cuda mangaforge` để dùng GPU. Đóng ứng dụng trước khi đổi chế độ. Dùng `MF_TORCH=cpu mangaforge` để quay lại CPU. Lần đổi chế độ sẽ cài lại PyTorch trong môi trường riêng của MangaForge.
+
 ## Phát triển
 
-Yêu cầu: Windows 10/11, [uv](https://docs.astral.sh/uv/), Node.js 20+.
+Các lệnh dưới đây dành cho Windows 10/11, cần [uv](https://docs.astral.sh/uv/) và Node.js 20+. Trên Ubuntu 24.04, dùng quy trình tạo gói ở trên để chạy Electron với sandbox được cấu hình khi cài đặt.
 
 ```powershell
 # engine (Python 3.12)

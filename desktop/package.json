@@ -11,7 +11,8 @@
   "scripts": {
     "start": "electron .",
     "fetch-uv": "node ../scripts/fetch_uv.js",
-    "dist": "npm run fetch-uv && electron-builder --win nsis --x64 --publish never"
+    "dist": "npm run fetch-uv && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "npm run fetch-uv -- --linux && electron-builder --linux deb --x64 --publish never"
   },
   "devDependencies": {
     "electron": "33.4.11",
@@ -49,10 +50,6 @@
         "to": "fonts"
       },
       {
-        "from": "bin/uv.exe",
-        "to": "bin/uv.exe"
-      },
-      {
         "from": "../LICENSE",
         "to": "LICENSE"
       },
@@ -65,7 +62,30 @@
       "target": [
         "nsis"
       ],
-      "icon": "icon.ico"
+      "icon": "icon.ico",
+      "extraResources": [
+        {
+          "from": "bin/uv.exe",
+          "to": "bin/uv.exe"
+        }
+      ]
+    },
+    "linux": {
+      "target": ["deb"],
+      "icon": "icon.png",
+      "category": "Graphics",
+      "artifactName": "MangaForge-${version}-amd64.deb",
+      "extraResources": [
+        {
+          "from": "bin/linux/uv",
+          "to": "bin/uv"
+        }
+      ]
+    },
+    "deb": {
+      "maintainer": "MangaForge contributors <132671977+PhamTienThang2510@users.noreply.github.com>",
+      "afterInstall": "../packaging/linux/after-install.tpl",
+      "afterRemove": "../packaging/linux/after-remove.tpl"
     },
     "nsis": {
       "oneClick": false,
