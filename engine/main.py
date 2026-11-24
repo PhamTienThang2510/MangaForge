@@ -122,7 +122,8 @@ def _run_job(job, name, idxs, do_translate, do_clean):
     eng = Engine.get()
     try:
         d = P.load(name)
-        history = []
+        # giai đoạn 1: nhận diện + OCR + xoá chữ từng trang; giai đoạn 2: gom chữ mọi trang rồi dịch một lượt
+        span = 0.85 if do_translate else 1.0
         for n, i in enumerate(idxs):
             pg = d["pages"][i]
             job["msg"] = f"Trang {i + 1}/{len(d['pages'])}: nhận diện + OCR"
@@ -139,17 +140,30 @@ def _run_job(job, name, idxs, do_translate, do_clean):
                 _imwrite(P.path(name, "work", _stem(pg) + "_mask.png"), mask)
                 _imwrite(P.path(name, "work", _stem(pg) + "_clean.png"), clean)
                 pg["patched"] = patched
-            if do_translate:
-                job["msg"] = f"Trang {i + 1}: dịch theo ngữ cảnh"
-                tw = []
-                history += T.translate_page(pg["blocks"], d["lang"], history, d["glossary"], _settings_with_key(d), report=tw)
-                if tw:
-                    job.setdefault("warnings", [])
-                    job["warnings"] += [w for w in tw if w not in job["warnings"]]
             pg["status"] = "done"
             pg["rev"] += 1
             P.save(name, d)
-            job["progress"] = (n + 1) / len(idxs)
+            job["progress"] = (n + 1) / len(idxs) * span
+        if do_translate and idxs:
+            order = sorted(set(idxs))
+            # ngữ cảnh: bản dịch của 2 trang ngay trước nhóm trang đang dịch (nếu có)
+            history = [{"src": b["original"], "dst": b.get("translated", "")}
+                       for pg in d["pages"][max(0, order[0] - 2):order[0]] for b in pg["blocks"] if b.get("original")]
+
+            def prog(k, total):
+                job["msg"] = "Đang dịch cả chương theo ngữ cảnh" + (f" (phần {k + 1}/{total})" if total > 1 else "")
+                job["progress"] = span + (1 - span) * k / total
+
+            prog(0, 1)
+            tw = []
+            T.translate_chapter([(i + 1, d["pages"][i]["blocks"]) for i in order], d["lang"], history,
+                                d["glossary"], _settings_with_key(d), report=tw, progress=prog)
+            if tw:
+                job["warnings"] = list(dict.fromkeys(tw))
+            for i in order:
+                d["pages"][i]["rev"] += 1
+            P.save(name, d)
+            job["progress"] = 1.0
         job["state"] = "done"
         job["msg"] = "Hoàn tất" + (" — có cảnh báo khi dịch" if job.get("warnings") else "")
     except Exception as e:
@@ -181,7 +195,7 @@ def retranslate(name: str, i: int):
     for pg in d["pages"][max(0, i - 2):i]:
         hist += [{"src": b["original"], "dst": b["translated"]} for b in pg["blocks"] if b.get("original")]
     warn = []
-    T.translate_page(_page(d, i)["blocks"], d["lang"], hist, d["glossary"], _settings_with_key(d), report=warn)
+    T.translate_page(_page(d, i)["blocks"], d["lang"], hist, d["glossary"], _settings_with_key(d), report=warn, page_no=i + 1)
     d["pages"][i]["rev"] += 1
     P.save(name, d)
     return {**d["pages"][i], "warnings": warn}

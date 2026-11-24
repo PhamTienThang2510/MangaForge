@@ -1,4 +1,4 @@
-"""Dịch theo ngữ cảnh: gửi cả trang (+ lịch sử trang trước) + glossary + văn phong cho LLM, nhận JSON về."""
+"""Dịch theo ngữ cảnh: gom chữ cả chương (+ lịch sử trang trước) + glossary + văn phong gửi cho LLM, nhận JSON về."""
 import json, re, requests
 
 LANG_NAME = {"ja": "tiếng Nhật", "ko": "tiếng Hàn", "zh": "tiếng Trung", "en": "tiếng Anh"}
@@ -49,19 +49,29 @@ def _free_translate(texts, sl, tries=3):
     return None, errs[-1] if errs else "không rõ lỗi"
 
 
-def _prompt(lang, items, history, glossary, style, notes):
+def _prompt(lang, items, history, glossary, style, notes, context=None, done=None):
+    """items: các ô cần dịch [{id, page, type, text}]. context: toàn bộ ô của chương (khi chương dài phải chia phần)
+    để phần nào cũng thấy chung một ngữ cảnh. done: các bản dịch đã có của những phần trước."""
     gl = "\n".join(f"- {g['src']} => {g['dst']}" + (f" ({g['note']})" if g.get("note") else "")
                    for g in glossary) or "(trống)"
-    hist = "\n".join(f"[{h['src']}] -> [{h['dst']}]" for h in history[-12:]) or "(đây là trang đầu)"
+    hist = "\n".join(f"[{h['src']}] -> [{h['dst']}]" for h in history[-12:]) or "(không có)"
+    extra = ""
+    if context:
+        extra += ("\nTOÀN BỘ VĂN BẢN GỐC CỦA CHƯƠNG (chỉ để nắm ngữ cảnh, KHÔNG dịch phần này):\n"
+                  + "\n".join(f"(trang {c['page']}, id {c['id']}) {c['text']}" for c in context))
+    if done:
+        extra += ("\nCÁC Ô ĐÃ DỊCH Ở PHẦN TRƯỚC (giữ nhất quán):\n"
+                  + "\n".join(f"(id {i}) {v}" for i, v in done.items()))
     return f"""Bạn là dịch giả truyện tranh chuyên nghiệp, dịch {LANG_NAME.get(lang, lang)} sang tiếng Việt.
 Văn phong: {style or 'tự nhiên, đúng giọng nhân vật'}.
 Ghi chú truyện: {notes or '(không)'}
-QUY TẮC: giữ nhất quán tên riêng và cách xưng hô theo GLOSSARY; câu ngắn gọn vừa bóng thoại; ô loại sfx dịch thành từ tượng thanh tiếng Việt ngắn; không giải thích.
+QUY TẮC: đọc hết mọi ô để nắm mạch truyện trước khi dịch; giữ nhất quán tên riêng và cách xưng hô theo GLOSSARY
+và xuyên suốt cả chương; câu ngắn gọn vừa bóng thoại; ô loại sfx dịch thành từ tượng thanh tiếng Việt ngắn; không giải thích.
 GLOSSARY:
 {gl}
-NGỮ CẢNH CÁC TRANG TRƯỚC (gốc -> dịch):
-{hist}
-CÁC Ô THOẠI TRANG HIỆN TẠI (đúng thứ tự đọc):
+NGỮ CẢNH CÁC TRANG TRƯỚC ĐÓ (gốc -> dịch):
+{hist}{extra}
+CÁC Ô THOẠI CẦN DỊCH (theo thứ tự trang, trong mỗi trang theo thứ tự đọc; "page" là số trang):
 {json.dumps(items, ensure_ascii=False)}
 Trả về DUY NHẤT một mảng JSON: [{{"id":<id>,"vi":"<bản dịch>"}}, ...] đủ mọi id."""
 
@@ -71,13 +81,35 @@ def _parse(txt):
     return {int(o["id"]): str(o["vi"]).strip() for o in json.loads(m.group(0))}
 
 
-def _call_llm(provider, key, model, prompt):
+def _chat_url(base):
+    """Nhận URL gốc (https://host/v1) hoặc URL đầy đủ từ portal (…/chat/completions?api-version=…)."""
+    from urllib.parse import urlsplit, urlunsplit
+    u = urlsplit(base.strip())
+    path = u.path.rstrip("/")
+    if not path.endswith("/chat/completions"):
+        path += "/chat/completions"
+    return urlunsplit((u.scheme, u.netloc, path, u.query, ""))
+
+
+def _openai_compat(base, key, model, prompt, timeout=300):
+    r = requests.post(_chat_url(base),
+                      # Bearer cho DeepSeek/OpenAI; "api-key" cho endpoint triển khai kiểu Azure AI Foundry
+                      headers={"Authorization": f"Bearer {key}", "api-key": key},
+                      json={"model": model, "temperature": 0.3,
+                            "messages": [{"role": "user", "content": prompt}]}, timeout=timeout)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
+
+
+def _call_llm(provider, key, model, prompt, endpoint=""):
+    if provider == "deepseek":  # API tương thích OpenAI; endpoint: URL do portal triển khai cấp (tuỳ chọn)
+        return _openai_compat(endpoint or "https://api.deepseek.com", key, model or "deepseek-chat", prompt)
     if provider == "anthropic":
         r = requests.post("https://api.anthropic.com/v1/messages",
                           headers={"x-api-key": key, "anthropic-version": "2023-06-01",
                                    "content-type": "application/json"},
-                          json={"model": model or "claude-sonnet-5-5", "max_tokens": 4096, "temperature": 0.3,
-                                "messages": [{"role": "user", "content": prompt}]}, timeout=120)
+                          json={"model": model or "claude-sonnet-5-5", "max_tokens": 16000, "temperature": 0.3,
+                                "messages": [{"role": "user", "content": prompt}]}, timeout=300)
         r.raise_for_status()
         return r.json()["content"][0]["text"]
     if provider == "gemini":
@@ -85,17 +117,12 @@ def _call_llm(provider, key, model, prompt):
         r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent",
                           headers={"x-goog-api-key": key},  # key ở header, không nằm trong URL (tránh lộ key qua log/lỗi)
                           json={"contents": [{"parts": [{"text": prompt}]}],
-                                "generationConfig": {"temperature": 0.3}}, timeout=120)
+                                "generationConfig": {"temperature": 0.3}}, timeout=300)
         r.raise_for_status()
         return r.json()["candidates"][0]["content"]["parts"][0]["text"]
     if provider == "openai":  # tương thích LM Studio / Ollama / OpenAI: model = "base_url|ten_model"
         base, _, mdl = (model or "").partition("|")
-        r = requests.post((base or "https://api.openai.com/v1") + "/chat/completions",
-                          headers={"Authorization": f"Bearer {key}"},
-                          json={"model": mdl or "gpt-4o-mini", "temperature": 0.3,
-                                "messages": [{"role": "user", "content": prompt}]}, timeout=180)
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        return _openai_compat(base or "https://api.openai.com/v1", key, mdl or "gpt-4o-mini", prompt)
     raise ValueError(provider)
 
 
@@ -108,6 +135,8 @@ def _friendly(e):
         return "yêu cầu bị từ chối (400) — thường do API key sai hoặc sai tên model"
     if code in (401, 403) or "401" in t or "403" in t:
         return "API key không hợp lệ hoặc chưa được cấp quyền"
+    if code == 402 or "402" in t:
+        return "tài khoản API hết số dư (402)"
     if code == 429 or "429" in t:
         return "dịch vụ báo vượt giới hạn (429) — chờ một lát rồi thử lại"
     if code == 404 or "404" in t:
@@ -117,10 +146,36 @@ def _friendly(e):
     return t[:160]
 
 
-def translate_page(blocks, lang, history, glossary, settings, report=None):
-    """Điền block['translated'] tại chỗ (bỏ qua ô đã khoá/giữ nguyên). Trả về list {src,dst} làm ngữ cảnh trang sau.
-    report (list): nhận các cảnh báo để giao diện hiển thị rõ khi không dịch được."""
-    todo = [b for b in blocks if b.get("original") and not b.get("keep")]
+# Chương dài được chia phần để bản dịch trả về không vượt giới hạn token đầu ra của model;
+# mỗi phần vẫn kèm toàn văn gốc của chương + các bản dịch đã có nên vẫn chung một ngữ cảnh.
+LLM_CHUNK_CHARS = 6000
+GTX_CHUNK_CHARS = 1000  # Google miễn phí gửi chữ qua URL -> giới hạn độ dài mỗi lần
+
+
+def _chunks(items, limit):
+    out, cur, n = [], [], 0
+    for it in items:
+        if cur and n + len(it["text"]) > limit:
+            out.append(cur)
+            cur, n = [], 0
+        cur.append(it)
+        n += len(it["text"])
+    if cur:
+        out.append(cur)
+    return out
+
+
+def translate_chapter(pages, lang, history, glossary, settings, report=None, progress=None):
+    """Gom chữ của mọi trang rồi mới dịch một lượt để cả chương chung một ngữ cảnh.
+    pages: [(số trang hiển thị, blocks)]. Điền block['translated'] tại chỗ (bỏ qua ô đã khoá/giữ nguyên).
+    report (list): nhận cảnh báo. progress(k, n): báo đang dịch phần k/n. Trả list {src,dst} làm ngữ cảnh về sau."""
+    todo, items = [], []
+    for page_no, blocks in pages:
+        for b in blocks:
+            if b.get("original") and not b.get("keep"):
+                todo.append(b)
+                items.append({"id": len(items) + 1, "page": page_no, "type": b.get("type", "speech"),
+                              "text": b["original"]})
     if not todo:
         return []
     warn = report if report is not None else []
@@ -130,24 +185,42 @@ def translate_page(blocks, lang, history, glossary, settings, report=None):
         if not key and provider != "openai":
             warn.append(f"Chưa nhập API key cho {provider} — tạm dùng Google Translate miễn phí")
         else:
-            items = [{"id": b["id"], "type": b.get("type", "speech"), "text": b["original"]} for b in todo]
+            parts = _chunks(items, LLM_CHUNK_CHARS)
+            many = len(parts) > 1
             try:
-                result = _parse(_call_llm(provider, key, settings.get("model"),
-                                          _prompt(lang, items, history, glossary,
-                                                  settings.get("style"), settings.get("notes"))))
+                for k, part in enumerate(parts):
+                    if progress:
+                        progress(k, len(parts))
+                    prompt = _prompt(lang, part, history, glossary, settings.get("style"), settings.get("notes"),
+                                     context=items if many else None, done=dict(result) if many else None)
+                    got = _parse(_call_llm(provider, key, settings.get("model"), prompt,
+                                           endpoint=(settings.get("endpoint") or "").strip()))
+                    result.update({i: v for i, v in got.items() if v})
             except Exception as e:
                 print("LLM lỗi, dùng Google Translate:", _friendly(e))
-                warn.append(f"{provider} lỗi: {_friendly(e)} — tạm dùng Google Translate miễn phí")
-    if not result:
-        gt, err = _free_translate([b["original"] for b in todo], lang)
-        if gt:
-            result = {b["id"]: t for b, t in zip(todo, gt)}
-        else:
-            warn.append(f"Không dịch được: Google Translate miễn phí từ chối ({_friendly(err)}). "
-                        "Thử lại sau ít phút, hoặc dùng Gemini (có gói miễn phí) / Claude trong tab Dịch.")
+                warn.append(f"{provider} lỗi: {_friendly(e)} — tạm dùng Google Translate miễn phí cho phần còn lại")
+    missing = [it for it in items if not result.get(it["id"])]
+    if missing:
+        if progress and provider == "gtx":
+            progress(0, 1)
+        failed = None
+        for part in _chunks(missing, GTX_CHUNK_CHARS):
+            gt, err = _free_translate([it["text"] for it in part], lang)
+            if gt:
+                result.update({it["id"]: t for it, t in zip(part, gt)})
+            else:
+                failed = err
+        if failed:
+            warn.append(f"Không dịch được một số ô: Google Translate miễn phí từ chối ({_friendly(failed)}). "
+                        "Thử lại sau ít phút, hoặc dùng DeepSeek / Gemini / Claude trong tab Dịch.")
     pairs = []
-    for b in todo:
-        if not b.get("locked") and result.get(b["id"]):
-            b["translated"] = result[b["id"]]
+    for b, it in zip(todo, items):
+        if not b.get("locked") and result.get(it["id"]):
+            b["translated"] = result[it["id"]]
         pairs.append({"src": b["original"], "dst": b.get("translated", "")})
     return pairs
+
+
+def translate_page(blocks, lang, history, glossary, settings, report=None, page_no=1):
+    """Dịch lại một trang (lịch sử các trang trước làm ngữ cảnh)."""
+    return translate_chapter([(page_no, blocks)], lang, history, glossary, settings, report=report)

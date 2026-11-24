@@ -21,7 +21,7 @@ Nhận diện chữ → OCR → xoá chữ → dịch theo ngữ cảnh cả ch�
 - **Nhận diện & OCR**: phát hiện ô chữ (comic-text-detector), OCR tiếng Nhật (manga-ocr), Hàn/Trung/Anh (EasyOCR), tự sắp thứ tự đọc.
 - **Xoá chữ sạch**: LaMa tinh chỉnh cho manga; bong bóng nền phẳng được tô thẳng màu nền nên giữ nguyên viền; **tự dò lại chữ còn sót và xoá thêm**; cọ xoá tay.
 - **Nhận diện loại bong bóng**: thoại, suy nghĩ, hét, dẫn truyện, chữ trên tranh, SFX — chữ dịch được dàn khít theo hình bong bóng thật.
-- **Dịch theo ngữ cảnh cả chương**: gửi cả trang + các câu trang trước + glossary (tên riêng, xưng hô) + văn phong cho Claude / Gemini / OpenAI / LM Studio / Ollama.
+- **Dịch theo ngữ cảnh cả chương**: gom chữ của mọi trang rồi gửi một lượt (kèm glossary tên riêng, xưng hô + văn phong) cho DeepSeek / Claude / Gemini / OpenAI / LM Studio / Ollama để cả chương chung một ngữ cảnh.
 - **Editor trực quan**: so sánh trước/sau bằng thanh kéo; kéo/đổi cỡ ô, chữ cập nhật ngay; nhấp đúp để sửa chữ; nhập số chính xác cho khung, cỡ chữ, giãn dòng, màu, viền; hoàn tác/làm lại.
 - **Giữ nguyên chữ gốc** cho ô không cần dịch (logo, tiêu đề, SFX…).
 - **Thư viện font**: 18 font Google (OFL) viết được tiếng Việt; thêm font riêng, tự kiểm tra font có đủ dấu tiếng Việt.
@@ -44,7 +44,7 @@ xong trong khoảng 1 phút; chạy bằng CPU của chính máy đó: khoảng 
 chậm hơn RTX 3050 một chút.
 
 - Card NVIDIA đời cũ hơn (GTX 10xx, 9xx) hoặc card AMD/Intel: app tự dùng **bản CPU** — vẫn chạy đủ tính năng, chỉ chậm hơn.
-- Dịch bằng Claude / Gemini / OpenAI / Google chạy trên máy chủ của họ nên **không tốn tài nguyên máy bạn**.
+- Dịch bằng DeepSeek / Claude / Gemini / OpenAI / Google chạy trên máy chủ của họ nên **không tốn tài nguyên máy bạn**.
 - Đã có card NVIDIA mà góc trên app hiện "Engine: CPU" → cập nhật driver NVIDIA rồi mở lại app.
 
 ## Cài đặt (người dùng)
@@ -54,7 +54,7 @@ chậm hơn RTX 3050 một chút.
    - Máy có card **NVIDIA** → bản tăng tốc GPU (khoảng 3–4 GB).
    - Máy không có → bản CPU (khoảng 1–1,5 GB, chạy chậm hơn).
    - Model AI (~750 MB) được tải **trực tiếp từ nguồn gốc** (GitHub / Hugging Face) và kiểm tra SHA-256.
-3. Dịch bằng AI: vào tab **Dịch**, chọn Claude / Gemini / OpenAI và nhập API key **của bạn** (key chỉ lưu trong máy bạn).
+3. Dịch bằng AI: vào tab **Dịch**, chọn DeepSeek / Claude / Gemini / OpenAI và nhập API key **của bạn** (key chỉ lưu trong máy bạn).
 
 Dữ liệu: project và font tự thêm ở `Documents\MangaForge`; engine + model ở `%LOCALAPPDATA%\MangaForge` (xoá thư mục này để cài lại engine).
 
@@ -67,7 +67,7 @@ cd desktop
 npm ci
 npm run dist:linux
 cd ..
-sudo apt install ./dist/MangaForge-0.3.3-amd64.deb
+sudo apt install ./dist/MangaForge-0.3.4-amd64.deb
 ```
 
 Mở **MangaForge** từ menu ứng dụng. Lần đầu, chọn thư mục riêng có quyền ghi và ít nhất 3 GB trống. Mặc định là `~/.local/share/MangaForge` (hoặc `$XDG_DATA_HOME/MangaForge`). Cần Internet để tải Python, thư viện và model. API key được lưu trong file riêng của tài khoản, dưới dạng base64 và không mã hoá.
@@ -135,7 +135,7 @@ MangaForge là công cụ hỗ trợ dịch. Hãy tôn trọng bản quyền c�
 
 MangaForge is an open-source (GPL-3.0) desktop tool for manga/comic scanlation teams: text detection, OCR (JA/KO/ZH/EN),
 inpainting with automatic leftover-text cleanup, speech-bubble type detection, chapter-level context-aware translation via
-LLMs (Claude, Gemini, OpenAI-compatible, local LM Studio/Ollama), a WYSIWYG lettering editor, and PNG/PDF/PSD/Excel export.
+LLMs (DeepSeek, Claude, Gemini, OpenAI-compatible, local LM Studio/Ollama), a WYSIWYG lettering editor, and PNG/PDF/PSD/Excel export.
 The Windows installer sets up its Python engine on first launch with `uv` and downloads the AI models from their original
 sources with SHA-256 verification.
 
